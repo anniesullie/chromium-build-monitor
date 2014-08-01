@@ -1,0 +1,260 @@
+{% raw %}
+<!doctype html>
+<html>
+  <head>
+    <link href='//fonts.googleapis.com/css?family=RobotoDraft:regular,bold,italic,thin,light,bolditalic,black,medium&lang=en' rel='stylesheet' type='text/css'>
+    <link href="//cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.css" rel="stylesheet" type="text/css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/polymer/0.3.3/platform.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/polymer/0.3.3/polymer.js"></script>
+    <script>
+      var MASTERS = {% endraw %}{{ masters|safe }}{% raw %};
+    </script>
+
+    <polymer-element name="url-updater" attributes="name value default">
+      <script>
+        Polymer('url-updater', {
+          ready: function() {
+            this.getValueFromQuery();
+            window.addEventListener('popstate', this.getValueFromQuery.bind(this));
+          },
+          getValueFromQuery: function() {
+            // Take value from url if present.
+            var query = document.location.search.substring(1).split('&');
+            for (var i = 0; i < query.length; i++) {
+              var parts = query[i].split('=');
+              if (parts[0] == this.name) {
+                this.value = parts[1];
+                return;
+              }
+            }
+            if (this.default && !this.value) {
+              this.value = this.default;
+            }
+          },
+          valueChanged: function() {
+            // Update url with new value.
+            var query = document.location.search.substring(1).split('&');
+            if (query[0] == "") {
+              query = []
+            }
+            var found = false;
+            for (var i = 0; i < query.length; i++) {
+              var parts = query[i].split('=');
+              if (parts[0] == this.name) {
+                query[i] = this.name + '=' + this.value;
+                found = true;
+                break;
+              }
+            }
+            if (!found) {
+              query.push(this.name + '=' + this.value);
+            }
+            query = '?' + query.join('&');
+            var url = document.location.href;
+            url = url.substr(0, url.indexOf('?'));
+            url += query;
+            history.pushState(null, null, url);
+          }
+        });
+      </script>
+    </polymer-element>
+
+    <polymer-element name="sortby-select" attributes="value name default" extends="url-updater">
+      <template>
+        <div class="subhead">Sort steps by</div>
+        <select id="select" on-change="handleChange" value="{{value}}">
+          <option value="failure_rate">Failure Rate</option>
+          <option value="mean">Mean Time</option>
+          <option value="median">Median Time</option>
+          <option value="ninety">90th Percentile Time</option>
+          <option value="ninetynine">99th Percentile Time</option>
+          <option value="maximum">Max time</option>
+        </select>
+      </template>
+      <script>
+        Polymer('sortby-select', {});
+      </script>
+    </polymer-element>
+
+    <polymer-element name="master-select" attributes="masters name" extends="url-updater">
+      <template>
+        <div class="subhead">Masters</div>
+        <select id="select" value="{{value}}">
+          <option template repeat="{{options}}">{{}}</option>
+        </select>
+      </template>
+      <script>
+        Polymer('master-select', {
+          options: [],
+          value: null,
+          ready: function() {
+            this.options = Object.keys(this.masters);
+            // This line is a hack to workaround the fact that the value is not
+            // initially set.
+            if (!this.value) {
+              this.value = this.options[0];
+            }
+            this.super();
+          }
+        });
+      </script>
+    </polymer-element>
+
+    <polymer-element name="step-stat" attributes="name master step stats">
+      <template>
+        <style>
+          #stats {
+            margin: 4px;
+          }
+          #results {
+            padding: 16px;
+            background-color: #fff;
+          }
+          .header {
+            padding: 16px;
+            color: #fff;
+            background-color: #000;
+            cursor: pointer;
+          }
+          .success-header {
+            background-color: #12c700;
+          }
+          .warnings-header {
+            background-color: #ffab00;
+          }
+          .failure-header {
+            background-color: #e00032;
+          }
+          .exception-header {
+            background-color: #aa00ff;
+          }
+          .skipped-header, .retry-header {
+            background-color: #616161;
+          }
+        </style>
+        <div id="stats" hidden?="{{stats.count==0}}">
+          <div class="subhead {{statusClass}}-header header" on-click="{{openBuildList}}">{{name}}</div>
+          <div id="results">
+            <div id="count"><span class="body2">Count:</span> {{stats.count}}</div>
+            <div id="failure_rate"><span class="body2">Failure rate:</span> {{stats.failure_rate}}&#37;</div>
+            <div id="mean"><span class="body2">Mean time:</span> {{stats.mean}}s</div>
+            <div id="median"><span class="body2">Median time:</span> {{stats.median}}s</div>
+            <div id="ninety"><span class="body2">90th percentile time:</span> {{stats.ninety}}s</div>
+            <div id="ninetynine"><span class="body2">99th percentile time:</span> {{stats.ninetynine}}s</div>
+            <div id="maximum"><span class="body2">Maximum time:</span> {{stats.maximum}}s</div>
+            <div id="sttdev"><span class="body2">Standard deviation:</span> {{stats.stddev}}</div>
+          </div>
+        </div>
+      </template>
+      <script>
+        Polymer('step-stat', {
+          openBuildList: function(event, detail, sender) {
+            url = 'build-list?master=' + this.master + '&step=' + this.step;
+            window.open(url);
+          }
+        });
+      </script>
+    </polymer-element>
+
+    <polymer-element name="step-stats" attributes="sortby masters">
+      <template>
+        <style>
+          :host {
+            display: flex;
+            flex-flow: row;
+          }
+          #selectors {
+            padding: 10px;
+            flex-grow: 0;
+          }
+          #results {
+            display: flex;
+            flex-flow: row wrap;
+            align-content: flex-start;
+            background-color: #e9eaed;
+            flex-grow: 1;
+            padding: 4px;
+          }
+          :host /deep/ * {
+            font-family: 'RobotoDraft';
+            font-size: 13px;
+            font-weight: 400;
+            line-height: 1.5;
+            color: #212121;
+          }
+          :host /deep/ .body2 {
+            font-family: 'RobotoDraft';
+            font-size: 13px;
+            font-weight: 500;
+          }
+          :host /deep/ .subhead  {
+            font-family: 'RobotoDraft';
+            font-size: 15px;
+            font-weight: 400;
+            line-height: 2.2;
+          }
+        </style>
+        <div id="selectors">
+          <sortby-select name="sortby" value="{{sortby}}" default="failure_rate"></sortby-select><br><br>
+          <master-select id="masters" masters="{{masters}}" name="masters" value="{{currentMaster}}"></master-select>
+          <div id="builders">
+            <div class="subhead">Builders</div>
+            <template repeat="{{builder in masters[currentMaster].builders}}">
+              <div><a
+                       href="http://build.chromium.org/p/{{currentMaster}}/builders/{{builder}}"
+                       target="_blank">{{builder}}</a></div>
+            </template>
+          </div>
+        </div>
+        <div id="results">
+          <template repeat="{{step in steps}}">
+            <step-stat name="{{step.name}}" master="{{currentMaster}}" step="{{step.name}}" stats="{{step.stats}}">
+            </step-stat>
+          </template>
+        </div>
+      </template>
+      <script>
+        Polymer('step-stats', {
+          ready: function() {
+          },
+          sortbyChanged: function() {
+            this.updateResults();
+          },
+          currentMasterChanged: function() {
+            this.updateResults();
+          },
+          updateResults: function() {
+            this.$.selectors.style.minWidth = this.$.builders.offsetWidth + 'px';
+            var steps = this.masters[this.currentMaster].steps;
+            var sortedSteps = [];
+            for (var step in steps) {
+              var newStep = {'name': step, 'stats': steps[step]};
+              var keys = ['maximum', 'mean', 'median', 'ninety', 'ninetynine', 'seventyfive', 'sttdev'];
+              for (var i = 0; i < keys.length; i++) {
+                if (newStep[keys[i]]) {
+                  newStep.stats[keys[i]] = Number(newStep.stats[keys[i]]).toFixed(2);
+                }
+              }
+              sortedSteps.push(newStep);
+            }
+            var sortby = this.sortby;
+            sortedSteps.sort(function(a, b) {
+              console.log(a);
+              return b.stats[sortby] - a.stats[sortby];
+            });
+            this.steps = sortedSteps;
+          }
+        });
+      </script>
+    </polymer-element>
+  </head>
+  <body>
+    <script>
+      var stats = document.createElement('step-stats');
+      stats.masters = MASTERS;
+      stats.sortby = 'failure_rate';
+      document.body.appendChild(stats);
+    </script>
+  </body>
+</html>
+{% endraw %}

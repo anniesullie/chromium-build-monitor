@@ -1,0 +1,126 @@
+{% raw %}
+<!doctype html>
+<html>
+  <head>
+    <link href='//fonts.googleapis.com/css?family=RobotoDraft:regular,bold,italic,thin,light,bolditalic,black,medium&lang=en' rel='stylesheet' type='text/css'>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/polymer/0.3.3/platform.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/polymer/0.3.3/polymer.js"></script>
+
+    <style>
+      body {
+        background-color: #e9eaed;
+        font-family: 'RobotoDraft';
+        margin: 16px;
+        color: #212121;
+      }
+      #contents {
+        display: flex;
+        flex-flow: row;
+      }
+      h1 {
+        width: 100%;
+        background-color: white;
+        line-height: 2;
+      }
+      iframe {
+        flex-grow: 1;
+        border: 0px;
+        margin-left: 16px;
+      }
+    </style>
+
+    <polymer-element name="build-list" attributes="master step numbuilds">
+      <template>
+        <style>
+          :host {
+            font-family: 'RobotoDraft';
+            font-size: 13px;
+            font-weight: 400;
+            line-height: 1.5;
+            padding:16px;
+            display: inline-block;
+            background-color: #fff;
+          }
+          .success {
+            color: #12c700;
+          }
+          .warnings {
+            color: #ffab00;
+          }
+          .failure {
+            color: #e00032;
+          }
+          .exception {
+            color: #aa00ff;
+          }
+          .skipped, .retry {
+            color: #616161;
+          }
+          hr {
+            border: 0;
+            height: 0;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+          }
+        </style>
+        <div id="details">
+          <h2>Last {{numbuilds}} builds</h2>
+          <template repeat="{{record in records}}">
+            <hr>
+            <div class="body2">{{record.builder}}</div>
+            <div>Build
+              <a target="_blank"
+                  href="http://build.chromium.org/p/{{master}}/builders/{{record.builder}}/builds/{{record.buildnumber}}/steps/{{step}}">{{record.buildnumber}}</a>
+            </div>
+            <div>Step time: {{record.step_time}}</div>
+            <div class="{{record.resultStr}}">Result: {{record.resultStr}}</div>
+            <div>Revision: {{record.revision}}</div>
+          </template>
+        </div>
+      </template>
+      <script>
+        Polymer('build-list', {
+          buildStepResults: ["success", "warnings", "failure", "skipped", "exception", "retry"],
+          ready: function() {
+            console.log('ready')
+            var url = 'https://chrome-infra-stats.appspot.com/_ah/api/stats/v1/steps/last/' +
+                      this.master + '/' +
+                      this.step + '/' +
+                      this.numbuilds;
+            var xhr = new XMLHttpRequest();
+            xhr.onload = (function() {
+              var response = JSON.parse(xhr.responseText);
+              this.records = response.step_records.map((function(r) {
+                r.resultStr = this.buildStepResults[r.result];
+                return r;
+              }).bind(this));
+            }).bind(this);
+            xhr.open('get', url, true);
+            xhr.send();
+          },
+        });
+      </script>
+    </polymer-element>
+  </head>
+  <body>
+    <h1 id="title"></h1>
+    <div id="contents"></div>
+    <script>
+      var title = document.getElementById('title');
+      var contents = document.getElementById('contents');
+      var master = decodeURIComponent(document.location.href.match(/master=([^\b^&]*)/)[1]);
+      var step = decodeURIComponent(document.location.href.match(/step=([^\b^&]*)/)[1]);
+      title.textContent = 'Step ' + step + ' on master ' + master;
+      var list = document.createElement('build-list');
+      list.master = master;
+      list.step = step;
+      list.numbuilds = 100;
+      contents.appendChild(list);
+      var iframeUrl = 'https://chrome-infra-stats.appspot.com/view/' + master + '/' + step;
+      var iframe = document.createElement('iframe');
+      iframe.src = iframeUrl;
+      contents.appendChild(iframe);
+    </script>
+  </body>
+</html>
+{% endraw %}

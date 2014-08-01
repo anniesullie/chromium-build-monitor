@@ -1,0 +1,7 @@
+queue:
+- name: UpdateStepData
+  rate: 10/s
+  max_concurrent_requests: 8
+  retry_parameters:
+    min_backoff_seconds: 10
+    task_retry_limit: 7

@@ -1,0 +1,24 @@
+application: chrome-build-monitor
+version: 1
+runtime: python27
+api_version: 1
+# TODO(sullivan): change this to yes after removing admin page
+threadsafe: no
+
+handlers:
+
+- url: /images
+  static_dir: images
+
+- url: /admin/.*
+  script: $PYTHON_LIB/google/appengine/ext/admin
+  login: admin
+
+- url: /.*
+  script: main.APPLICATION
+
+libraries:
+- name: webapp2
+  version: latest
+- name: jinja2
+  version: latest

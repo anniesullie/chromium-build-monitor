@@ -1,0 +1,4 @@
+cron:
+- description: Update master/step statistics
+  url: /update-stats
+  schedule: every monday 09:00

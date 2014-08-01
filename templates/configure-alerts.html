@@ -1,0 +1,259 @@
+{% raw %}<!doctype html>
+<html>
+  <head>
+    <script>
+      var STEPS = {% endraw %}{{ steps|safe }}{% raw %};
+      var RESULTS = {% endraw %}{{ results|safe }}{% raw %};
+      var METRIC = "{% endraw %}{{  metric }}{% raw %}";
+      var OPERATOR = {% endraw %}{{  operator|safe }}{% raw %};
+      var THRESHOLD = "{% endraw %}{{  threshold }}{% raw %}";
+    </script>
+    <title>Configure Alerts</title>
+    <link href='//fonts.googleapis.com/css?family=RobotoDraft:regular,bold,italic,thin,light,bolditalic,black,medium&lang=en' rel='stylesheet' type='text/css'>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/polymer/0.3.3/platform.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/polymer/0.3.3/polymer.js"></script>
+    <style>
+      body {
+        padding-left: 20px;
+        font-family: 'RobotoDraft';
+        font-size: 13px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212121;
+      }
+    </style>
+
+    <polymer-element name="alert-form" attributes="steps metric operator threshold">
+      <template>
+        <style>
+          :host {
+            font-family: 'RobotoDraft';
+            font-size: 13px;
+            font-weight: 400;
+            line-height: 1.5;
+            color: #212121;
+          }
+          form {
+            display: flex;
+            flex-flow: row;
+          }
+          input[type="text"] {
+            height: 16px;
+          }
+          .select-container {
+            margin: 16px;
+            display: flex;
+            flex-flow: column;
+            align-items: center;
+          }
+          .step-container {
+            max-height: 200px;
+            padding-right: 20px;
+            overflow-y: auto;
+            overflow-x: hidden;
+          }
+          label {
+            white-space: nowrap;
+          }
+        </style>
+        <form method="GET">
+          <div class="select-container">
+            <h2>Steps to check</h2>
+            <div class="step-container">
+              <label><input type="checkbox" on-change="{{handleAllCheckbox}}" id="all"> all</label><br>
+              <template repeat="{{step in steps}}">
+                <label><input type="checkbox"
+                              name="steps"
+                              value="{{step.name}}"
+                              checked="{{step.checked}}"
+                              on-change="{{updateAllCheckbox}}">
+                    {{step.name}}</label><br>
+              </template>
+            </div>
+          </div>
+          <div class="select-container">
+            <h2>Metric</h2>
+            <select name="metric" id="metric" value="{{metric}}">
+              <option value="failure_rate">Failure Rate</option>
+              <option value="mean">Mean Time</option>
+              <option value="median">Median Time</option>
+              <option value="ninety">90th Percentile Time</option>
+              <option value="ninetynine">99th Percentile Time</option>
+              <option value="maximum">Max time</option>
+            </select>
+          </div>
+          <div class="select-container">
+            <h2>Operator</h2>
+            <select name="operator" id="operator" value="{{operator}}">
+              <option value="&#61;">&#61;</option>
+              <option value="&lt;">&lt;</option>
+              <option value="&gt;">&gt;</option>
+            </select>
+          </div>
+          <div class="select-container">
+            <h2>Threshold</h2>
+            <input name="threshold" id="threshold" type="text" value="{{threshold}}">
+          </div>
+          <div class="select-container">
+            <h2>&nbsp;</h2>
+            <input type="submit" value="Show Results">
+          </div>
+        </form>
+      </template>
+      <script>
+        Polymer('alert-form', {
+          ready: function() {
+            this.updateAllCheckbox();
+          },
+          handleAllCheckbox: function() {
+            var checked = this.$.all.checked;
+            for (var i = 0; i < this.steps.length; i++) {
+              this.steps[i].checked = checked;
+            }
+            this.updateAllCheckbox();
+          },
+          updateAllCheckbox: function() {
+            allChecked = true;
+            for (var i = 0; i < this.steps.length; i++) {
+              if (!this.steps[i].checked) {
+                allChecked = false;
+                break;
+              }
+            }
+            this.$.all.checked = allChecked;
+          }
+        });
+      </script>
+    </polymer-element>
+
+    <polymer-element name="results-list" attributes="results metric operator threshold">
+      <template>
+        <style>
+          :host {
+            font-family: 'RobotoDraft';
+            font-size: 13px;
+            font-weight: 400;
+            line-height: 1.5;
+            color: #212121;
+          }
+          table {
+            border-spacing: 0;
+          }
+          table th, table td {
+            padding: 4px 16px 4px 4px;
+            text-align: left;
+            cursor: pointer;
+          }
+          tr:hover {
+            background-color: #e9eaed;
+          }
+          th {
+            background-color: white;
+          }
+          th[data-sortdown] {
+            background-image: url('images/sort-down.gif');
+            background-repeat: no-repeat;
+            background-position: 95% 40%;
+            background-color: white;
+          }
+          th[data-sortup] {
+            background-image: url('images/sort-up.gif');
+            background-repeat: no-repeat;
+            background-position: 95% 40%;
+            background-color: white;
+          }
+        </style>
+        <h2>Steps with {{metric}} {{operator}} {{threshold}}:</h2>
+        <table>
+          <tr>
+            <th id="sortMaster" on-click="{{sortByMaster}}">Master</th>
+            <th id="sortStep" on-click="{{sortByStep}}">Step</th>
+            <th id="sortMetric" on-click="{{sortByMetric}}">{{metric}}</th>
+          </tr>
+          <template repeat="{{result in results}}">
+            <tr data-master="{{result.master}}" data-step="{{result.step}}" on-click="{{trClick}}">
+              <td>{{result.master}}</td>
+              <td>{{result.step}}</td>
+              <td>{{result.data[metric]}}</td>
+            </tr>
+          </template>
+        </table>
+      </template>
+      <script>
+        Polymer('results-list', {
+          trClick: function(event, detail, sender) {
+            var master = sender.getAttribute('data-master');
+            var step = sender.getAttribute('data-step');
+            var url = '/build-list?master=' + master + '&step=' + step;
+            window.open(url);
+          },
+          resetAndGetSortDir: function(id) {
+            var th = this.$[id];
+            var sortDir = 'down';
+            if (th.getAttribute('data-sortdown')) {
+              sortDir = 'up';
+            }
+            this.$.sortMaster.removeAttribute('data-sortdown');
+            this.$.sortMaster.removeAttribute('data-sortup');
+            this.$.sortStep.removeAttribute('data-sortdown');
+            this.$.sortStep.removeAttribute('data-sortup');
+            this.$.sortMetric.removeAttribute('data-sortdown');
+            this.$.sortMetric.removeAttribute('data-sortup');
+            this.$[id].setAttribute('data-sort' + sortDir, true);
+            return sortDir;
+          },
+          sortByMaster: function() {
+            var sortDir = this.resetAndGetSortDir('sortMaster');
+            this.results.sort(function(a, b) {
+              if (sortDir == 'down') {
+                return a.master.localeCompare(b.master);
+              } else {
+                return b.master.localeCompare(a.master);
+              }
+            });
+          },
+          sortByStep: function() {
+            var sortDir = this.resetAndGetSortDir('sortStep');
+            this.results.sort(function(a, b) {
+              if (sortDir == 'down') {
+                return a.step.localeCompare(b.step);
+              } else {
+                return b.step.localeCompare(a.step);
+              }
+            });
+          },
+          sortByMetric: function() {
+            var sortDir = this.resetAndGetSortDir('sortMetric');
+            var metric = this.metric;
+            this.results.sort(function(a, b) {
+              if (sortDir == 'down') {
+               return Number(a.data[metric]) - Number(b.data[metric]);
+             } else {
+              return Number(b.data[metric]) - Number(a.data[metric])
+             }
+            });
+          }
+        });
+      </script>
+    </polymer-element>
+  </head>
+  <body>
+    <script>
+      var form = document.createElement('alert-form');
+      form.steps = STEPS;
+      form.metric = METRIC;
+      form.operator = OPERATOR;
+      form.threshold = THRESHOLD;
+      document.body.appendChild(form);
+
+      if (RESULTS && RESULTS.length > 0) {
+        var list = document.createElement('results-list');
+        list.results = RESULTS;
+        list.metric = METRIC;
+        list.operator = OPERATOR;
+        list.threshold = THRESHOLD;
+        document.body.appendChild(list);
+      }
+    </script>
+  </body>
+</html>{% endraw %}
